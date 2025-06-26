@@ -159,14 +159,6 @@ def my_detection(img_path,model,truth_boxes,truth_labels,iou_threshold=0.8):
                fig (PIL.Image.Image): 带有检测结果和标签的图片对象。
                ax (PIL.ImageDraw.Image): 用于绘制的对象。
     """
-    # 加载预训练目标检测模型maskrcnn
-    # model = detection.maskrcnn_resnet50_fpn(pretrained=True)
-    # 使用fasterrcnn模型
-    # model = detection.fasterrcnn_resnet50_fpn(pretrained=True)
-    # 改为使用 VGG16 骨干的 SSD300
-    # model = detection.ssd300_vgg16(pretrained=True) 
-    # 使用Retinanet模型
-    # model = detection.retinanet_resnet50_fpn(pretrained=True)
     model.to(device)
     model.eval()
     # 读取输入图像，并转化为tensor
@@ -185,12 +177,12 @@ def my_detection(img_path,model,truth_boxes,truth_labels,iou_threshold=0.8):
     bboxes = output[0]['boxes'].cpu().detach().numpy()  # 预测每一个obj的边框
 
 # ----预测框和真实框匹配----
-
-
     person_id = 1 # 行人 id
 
     # 过滤出预测为行人的框及其得分和位置
-    pred_index = np.where(labels == person_id)[0] # 获取所有预测为行人的索引
+    index_1 = np.where(labels == person_id)[0]  
+    index_2 = np.where(scores > 0.4)[0]  
+    pred_index =  np.intersect1d(index_1, index_2)  # 取交集，得到预测为行人且得分大于0.5的索引
     pred_boxes = bboxes[pred_index] 
     pred_scores = scores[pred_index]  
 
@@ -219,6 +211,7 @@ def my_detection(img_path,model,truth_boxes,truth_labels,iou_threshold=0.8):
                 best_truth_index = j
         
         # 如果最大 iou 大于阈值，并且此真实框未被匹配过
+        # and best_truth_index not in match_truth_index
         if best_iou >= iou_threshold and best_truth_index not in match_truth_index:
             tp += 1
             match_truth_index.add(best_truth_index)  # 标记此真实框已被匹配
@@ -233,13 +226,15 @@ def my_detection(img_path,model,truth_boxes,truth_labels,iou_threshold=0.8):
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
 
+    print(f"TP: {tp}, FP: {fp}, FN: {fn}")
 # ---- 绘图部分 ----
 
     draw = ImageDraw.Draw(origin_img)
     font = ImageFont.truetype('arial.ttf', 15)  
     person_id = 1
+
     # 只选取得分大于0.8的检测结果
-    obj_index = np.argwhere(scores > 0.8).squeeze(axis=1).tolist()
+    # obj_index = np.argwhere(scores > 0.8).squeeze(axis=1).tolist()
 
     # 绘制真实框 -- 绿色
     for i,truth_box in enumerate(person_truth_boxes):
@@ -248,7 +243,7 @@ def my_detection(img_path,model,truth_boxes,truth_labels,iou_threshold=0.8):
     
     # 绘制预测边界框 (红色 TP, 黄色 FP) 和文本
     for i in range(len(pred_boxes)):
-        if i in obj_index:  
+        # if i in obj_index:  
             pred_box = pred_boxes[i]
             pred_score = pred_scores[i]
             is_tp = i in match_pred_index  # 是否为真正例
@@ -338,7 +333,7 @@ if __name__ == '__main__':
     
     # 假设你已经有了 image_file_path，并且知道它在哪个 COCO 集合里
     # 并且有对应的 annotation_file 路径
-    img_filepath = "ObjectDetection/datasets/coco/coco-2017/validation/data/000000011051.jpg"
+    img_filepath = "ObjectDetection/datasets/coco/coco-2017/validation/data/000000032901.jpg"
     coco_val_annotation = "ObjectDetection/datasets/coco/coco-2017/raw/instances_val2017.json"
 
 
@@ -356,13 +351,13 @@ if __name__ == '__main__':
         print(f"真实标注的标签: {img_labels}")
 
         # 加载预训练目标检测模型maskrcnn
-        model = detection.maskrcnn_resnet50_fpn(pretrained=True)
+        # model = detection.maskrcnn_resnet50_fpn(pretrained=True)
         # 使用fasterrcnn模型
         # model = detection.fasterrcnn_resnet50_fpn(pretrained=True)
         # 改为使用 VGG16 骨干的 SSD300
         # model = detection.ssd300_vgg16(pretrained=True) 
         # 使用Retinanet模型
-        # model = detection.retinanet_resnet50_fpn(pretrained=True)
+        model = detection.retinanet_resnet50_fpn(pretrained=True)
 
         # 调用目标检测函数
         print("开始目标检测...")
