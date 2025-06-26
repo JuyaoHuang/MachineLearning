@@ -143,10 +143,9 @@ def calculate_iou(box1, box2):
 
 
 # 目标检测函数+指标评估
-def my_detection(img_path,model,truth_boxes,truth_labels,iou_threshold=0.5):
+def my_detection(img_path,model,truth_boxes,truth_labels,iou_threshold=0.8):
     """ 
     对单张图片进行预测, 并返回评估指标所需的信息
-    对单张图片进行目标检测，并计算精确率和召回率（针对行人）。
     Args:
         img_path (str): 输入图片路径。
         model (torchvision.models.detection): 预训练的目标检测模型。
@@ -186,8 +185,7 @@ def my_detection(img_path,model,truth_boxes,truth_labels,iou_threshold=0.5):
     bboxes = output[0]['boxes'].cpu().detach().numpy()  # 预测每一个obj的边框
 
 # ----预测框和真实框匹配----
-    # 只选取得分大于0.8的检测结果
-    obj_index = np.argwhere(scores > 0.8).squeeze(axis=1).tolist()
+
 
     person_id = 1 # 行人 id
 
@@ -240,8 +238,8 @@ def my_detection(img_path,model,truth_boxes,truth_labels,iou_threshold=0.5):
     draw = ImageDraw.Draw(origin_img)
     font = ImageFont.truetype('arial.ttf', 15)  
     person_id = 1
-
-    person_color = COLOR_MAP.get(person_id, 'red')  # 获取行人颜色，默认为红色
+    # 只选取得分大于0.8的检测结果
+    obj_index = np.argwhere(scores > 0.8).squeeze(axis=1).tolist()
 
     # 绘制真实框 -- 绿色
     for i,truth_box in enumerate(person_truth_boxes):
@@ -250,28 +248,29 @@ def my_detection(img_path,model,truth_boxes,truth_labels,iou_threshold=0.5):
     
     # 绘制预测边界框 (红色 TP, 黄色 FP) 和文本
     for i in range(len(pred_boxes)):
-        pred_box = pred_boxes[i]
-        pred_score = pred_scores[i]
-        is_tp = i in match_pred_index  # 是否为真正例
+        if i in obj_index:  
+            pred_box = pred_boxes[i]
+            pred_score = pred_scores[i]
+            is_tp = i in match_pred_index  # 是否为真正例
 
-        xmin, ymin, xmax, ymax = pred_box
-        color = 'red' if is_tp else 'yellow'
-        text_color = 'white' if is_tp else 'black'
+            xmin, ymin, xmax, ymax = pred_box
+            color = 'red' if is_tp else 'yellow'
+            text_color = 'white' if is_tp else 'black'
 
-        draw.rectangle([xmin,ymin,xmax,ymax], outline=color,width=2)
+            draw.rectangle([xmin,ymin,xmax,ymax], outline=color,width=2)
 
-        display_text = f"Person score: {pred_score:.3f}"
-        text_width = font.getlength(display_text)
-        text_height = font.getbbox(display_text)[3]  
-        text_loc = [xmin + 2., ymin - text_height - 2.]  # 放在框的上方一点
-        # if text_loc[1] < 0: text_loc[1] = ymin + 2.  # 如果超出顶部，则放在框的下方
-        textbox_loc = [xmin, text_loc[1], xmin + text_width + 4., text_loc[1] + text_height + 2.]
+            display_text = f"score: {pred_score:.3f}"
+            text_width = font.getlength(display_text)
+            text_height = font.getbbox(display_text)[3]  
+            text_loc = [xmin + 2., ymin - text_height - 2.]  # 放在框的上方一点
+            if text_loc[1] < 0: text_loc[1] = ymin + 2.  # 如果超出顶部，则放在框的下方
+            textbox_loc = [xmin, text_loc[1], xmin + text_width + 4., text_loc[1] + text_height + 2.]
 
-        img_width, img_height = origin_img.size
-        textbox_loc[2] = min(textbox_loc[2], img_width)
-        textbox_loc[3] = min(textbox_loc[3], img_height)
-        draw.rectangle(xy=textbox_loc, fill=color)
-        draw.text(xy=text_loc, text=display_text, fill=text_color, font=font)
+            img_width, img_height = origin_img.size
+            textbox_loc[2] = min(textbox_loc[2], img_width)
+            textbox_loc[3] = min(textbox_loc[3], img_height)
+            draw.rectangle(xy=textbox_loc, fill=color)
+            draw.text(xy=text_loc, text=display_text, fill=text_color, font=font)
 
 
     # ----该部分只画红框，暂时舍弃----
@@ -339,7 +338,7 @@ if __name__ == '__main__':
     
     # 假设你已经有了 image_file_path，并且知道它在哪个 COCO 集合里
     # 并且有对应的 annotation_file 路径
-    img_filepath = "ObjectDetection/datasets/coco/coco-2017/validation/data/000000016598.jpg"
+    img_filepath = "ObjectDetection/datasets/coco/coco-2017/validation/data/000000011051.jpg"
     coco_val_annotation = "ObjectDetection/datasets/coco/coco-2017/raw/instances_val2017.json"
 
 
